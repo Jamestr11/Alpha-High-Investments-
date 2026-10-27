@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Funds · AlphaX Invest</title>
+    <link rel="stylesheet" href="../css/app.css" />
+  </head>
+  <body>
+    <div id="app"></div>
+    <script src="../js/seed.js"></script>
+    <script src="../js/market.js"></script>
+    <script src="../js/store.js"></script>
+    <script src="../js/chart.js"></script>
+    <script src="../js/app.js"></script>
+    <script>
+      (function () {
+        var App = window.AlphaXApp;
+        var Store = window.AlphaXStore;
+        var Market = window.AlphaXMarket;
+        var Chart = window.AlphaXChart;
+
+        App.scriptsReady(function () {
+          var user = App.requireUser(["ADMIN"]);
+          if (!user) return;
+          var main = App.mountShell({ user: user, active: "funds" });
+          var state = Store.load();
+          var funds = state.funds
+            .slice()
+            .sort(function (a, b) {
+              return a.sortOrder - b.sortOrder;
+            });
+
+          main.innerHTML =
+            App.demoBanner() +
+            '<div id="ticker"></div>' +
+            '<div class="section-head"><div><h2 class="display">Fund roster</h2>' +
+            "<p>James’s six funds. Set project health (−2…+2) weekly — not real POS.</p></div></div>" +
+            '<div class="fund-grid" id="funds"></div>';
+
+          App.renderTicker(document.getElementById("ticker"));
+          var el = document.getElementById("funds");
+
+          funds.forEach(function (f) {
+            var chart = Market.buildFundChart(
+              f,
+              26,
+              Store.popularityBump(f.id)
+            );
+            var card = document.createElement("article");
+            card.className = "fund-card panel fade-up";
+            card.innerHTML =
+              "<header><div><h3 class=\"display\">" +
+              App.escapeHtml(f.name) +
+              (f.required
+                ? ' <span class="badge warn">Required</span>'
+                : "") +
+              '</h3><p class="hint" style="margin:0.35rem 0 0">' +
+              App.escapeHtml(f.description) +
+              "</p></div>" +
+              '<div class="mono ' +
+              (chart.changePct >= 0 ? "up" : "down") +
+              '">' +
+              App.formatPct(chart.changePct) +
+              "</div></header>" +
+              '<div class="fund-meta">' +
+              "<span><strong>Personality</strong> " +
+              App.escapeHtml(f.personality || "—") +
+              "</span>" +
+              "<span><strong>Drift</strong> " +
+              f.baseGrowthRate +
+              "%/wk</span>" +
+              "<span><strong>β</strong> " +
+              f.beta +
+              "</span>" +
+              "<span><strong>Vol</strong> " +
+              f.volatility +
+              "</span>" +
+              "<span><strong>Pop boost</strong> " +
+              (f.popularityBoostEnabled ? "on" : "off") +
+              "</span></div>" +
+              '<div class="chart-box" data-chart></div>' +
+              '<form class="row-actions health-form" data-fund="' +
+              f.id +
+              '">' +
+              '<div class="field" style="flex:1;min-width:160px">' +
+              "<label>Project health (−2…+2)</label>" +
+              '<input type="number" name="health" min="-2" max="2" step="0.25" value="' +
+              f.projectHealth +
+              '" />' +
+              "</div>" +
+              '<button type="submit" class="btn btn-primary" style="align-self:end">Save health</button>' +
+              "</form>";
+            el.appendChild(card);
+            Chart.render(card.querySelector("[data-chart]"), chart.candles, 170);
+          });
+
+          el.addEventListener("submit", function (e) {
+            var form = e.target.closest(".health-form");
+            if (!form) return;
+            e.preventDefault();
+            var res = Store.setProjectHealth(
+              user.id,
+              form.getAttribute("data-fund"),
+              form.health.value
+            );
+            if (!res.ok) {
+              App.toast(res.error, "error");
+              return;
+            }
+            App.toast("Project health updated for " + res.fund.name + ".", "ok");
+            location.reload();
+          });
+        });
+      })();
+    </script>
+  </body>
+</html>

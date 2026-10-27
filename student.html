@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Trade · AlphaX Invest</title>
+    <link rel="stylesheet" href="../css/app.css" />
+  </head>
+  <body>
+    <div id="app"></div>
+    <script src="../js/seed.js"></script>
+    <script src="../js/market.js"></script>
+    <script src="../js/store.js"></script>
+    <script src="../js/chart.js"></script>
+    <script src="../js/app.js"></script>
+    <script>
+      (function () {
+        var App = window.AlphaXApp;
+        var Store = window.AlphaXStore;
+        var Market = window.AlphaXMarket;
+        var Chart = window.AlphaXChart;
+
+        App.scriptsReady(function () {
+          var user = App.requireUser(["STUDENT"]);
+          if (!user) return;
+          var main = App.mountShell({ user: user, active: "student" });
+          var state = Store.load();
+          user = Store.getSession();
+
+          var reserved = Store.pendingReserved(user.id);
+          var available = Store.availableBalance(user.id);
+          var holdings = state.holdings
+            .filter(function (h) {
+              return h.studentId === user.id;
+            })
+            .map(function (h) {
+              return Store.enrichHolding(h);
+            })
+            .filter(Boolean);
+          var invested = holdings.reduce(function (s, h) {
+            return s + h.holding.amountInvested;
+          }, 0);
+          var current = holdings.reduce(function (s, h) {
+            return s + h.currentValue;
+          }, 0);
+
+          var funds = state.funds
+            .slice()
+            .sort(function (a, b) {
+              return a.sortOrder - b.sortOrder;
+            });
+
+          main.innerHTML =
+            App.demoBanner() +
+            '<div id="ticker"></div>' +
+            '<div class="stats fade-up">' +
+            '<div class="stat panel"><div class="label">Available</div><div class="value mono">' +
+            App.formatAlphaX(available) +
+            '</div><div class="hint">Balance ' +
+            App.formatAlphaX(user.balance) +
+            (reserved ? " · reserved " + App.formatAlphaX(reserved) : "") +
+            "</div></div>" +
+            '<div class="stat panel"><div class="label">Invested</div><div class="value mono">' +
+            App.formatAlphaX(invested) +
+            '</div><div class="hint">Mark-to-market ' +
+            App.formatAlphaX(current) +
+            "</div></div>" +
+            '<div class="stat panel"><div class="label">Lock terms</div><div class="value mono">' +
+            state.settings.lockWeeks +
+            "w</div><div class=\"hint\">~" +
+            state.settings.weeklyReturnPercent +
+            "%/wk expected drift</div></div>" +
+            "</div>" +
+            '<div class="section-head"><div><h2 class="display">Funds</h2>' +
+            "<p>Class Pet is required. Charts use synthetic SPY-like weeks (client-side).</p></div></div>" +
+            '<div class="fund-grid" id="funds"></div>' +
+            '<div class="section-head"><div><h2 class="display">Recent requests</h2>' +
+            "<p>James approves or rejects. Pending amounts are reserved.</p></div></div>" +
+            '<div class="panel table-wrap" id="requests"></div>';
+
+          App.renderTicker(document.getElementById("ticker"));
+
+          var fundsEl = document.getElementById("funds");
+          funds.forEach(function (f) {
+            var chart = Market.buildFundChart(
+              f,
+              26,
+              Store.popularityBump(f.id)
+            );
+            var card = document.createElement("article");
+            card.className = "fund-card panel fade-up";
+            card.innerHTML =
+              "<header><div><h3 class=\"display\">" +
+              App.escapeHtml(f.name) +
+              (f.required
+                ? ' <span class="badge warn">Required</span>'
+                : "") +
+              '</h3><p class="hint" style="margin:0.35rem 0 0">' +
+              App.escapeHtml(f.description) +
+              "</p></div>" +
+              '<div class="mono ' +
+              (chart.changePct >= 0 ? "up" : "down") +
+              '">' +
+              App.formatPct(chart.changePct) +
+              " · 26w</div></header>" +
+              '<div class="fund-meta">' +
+              "<span><strong>Personality</strong> " +
+              App.escapeHtml(f.personality || "—") +
+              "</span>" +
+              "<span><strong>Drift</strong> " +
+              f.baseGrowthRate +
+              "%/wk</span>" +
+              "<span><strong>β</strong> " +
+              f.beta +
+              "</span>" +
+              "<span><strong>Vol</strong> " +
+              f.volatility +
+              "</span>" +
+              "<span><strong>Health</strong> " +
+              f.projectHealth +
+              "</span>" +
+              (!f.popularityBoostEnabled
+                ? "<span><strong>Pop boost</strong> off</span>"
+                : "") +
+              "</div>" +
+              '<div class="chart-box" data-chart></div>' +
+              '<form class="row-actions invest-form" data-fund="' +
+              f.id +
+              '">' +
+              '<div class="field" style="flex:1;min-width:140px">' +
+              '<label for="amt-' +
+              f.id +
+              '">Amount (αX)</label>' +
+              '<input id="amt-' +
+              f.id +
+              '" type="text" inputmode="decimal" autocomplete="off" name="amount" placeholder="' +
+              state.settings.minDeposit +
+              '+" />' +
+              "</div>" +
+              '<button type="submit" class="btn btn-primary invest-submit" style="align-self:end;min-height:2.5rem;min-width:8.5rem">Request invest</button>' +
+              "</form>";
+            fundsEl.appendChild(card);
+            Chart.render(card.querySelector("[data-chart]"), chart.candles, 160);
+          });
+
+          function handleInvestSubmit(form) {
+            var amountInput = form.querySelector('[name="amount"]');
+            var amount = amountInput ? String(amountInput.value).trim() : "";
+            if (!amount) {
+              App.toast("Enter an AlphaX amount first.", "error");
+              if (amountInput) amountInput.focus();
+              return false;
+            }
+            var res = Store.submitInvest(
+              user.id,
+              form.getAttribute("data-fund"),
+              amount
+            );
+            if (!res.ok) {
+              App.toast(res.error, "error");
+              return false;
+            }
+            App.toast("Invest request submitted — waiting on James.", "ok");
+            location.reload();
+            return true;
+          }
+
+          fundsEl.querySelectorAll(".invest-form").forEach(function (form) {
+            form.addEventListener("submit", function (e) {
+              e.preventDefault();
+              handleInvestSubmit(form);
+            });
+            var btn = form.querySelector(".invest-submit");
+            if (btn) {
+              btn.addEventListener("click", function (e) {
+                // Explicit click path (helps some UI automation tools)
+                e.preventDefault();
+                handleInvestSubmit(form);
+              });
+            }
+          });
+
+          var reqs = state.requests
+            .filter(function (r) {
+              return r.studentId === user.id;
+            })
+            .slice(0, 8);
+          var reqEl = document.getElementById("requests");
+          if (!reqs.length) {
+            reqEl.innerHTML =
+              '<div class="empty"><strong>No requests yet</strong>Pick a fund and lock some AlphaX.</div>';
+          } else {
+            reqEl.innerHTML =
+              '<table class="okx-table"><thead><tr><th>When</th><th>Fund</th><th>Amount</th><th>Status</th></tr></thead><tbody>' +
+              reqs
+                .map(function (r) {
+                  var fund = state.funds.find(function (f) {
+                    return f.id === r.fundId;
+                  });
+                  return (
+                    "<tr><td>" +
+                    App.formatDateTime(r.createdAt) +
+                    "</td><td>" +
+                    App.escapeHtml(fund ? fund.name : "?") +
+                    '</td><td class="mono">' +
+                    App.formatAlphaX(r.amount) +
+                    '</td><td><span class="badge ' +
+                    r.status.toLowerCase() +
+                    '">' +
+                    r.status +
+                    "</span></td></tr>"
+                  );
+                })
+                .join("") +
+              "</tbody></table>";
+          }
+        });
+      })();
+    </script>
+  </body>
+</html>
