@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AlphaX Invest · Alpha High</title>
+    <meta
+      name="description"
+      content="Artificial AlphaX investing demo for Alpha High — GitHub Pages static site. Not real money."
+    />
+    <link rel="stylesheet" href="css/app.css" />
+  </head>
+  <body>
+    <div class="login-wrap">
+      <div class="login-card fade-up">
+        <div class="login-hero">
+          <div class="brand-mark">αX</div>
+          <p class="eyebrow">Alpha High · Financial Literacy</p>
+          <h1 class="display">AlphaX Invest</h1>
+          <p>
+            Lock artificial AlphaX into school funds that loosely track the market.
+            James approves. Guides oversee. Not real money.
+          </p>
+        </div>
+
+        <div class="panel" style="padding: 1.15rem">
+          <div class="demo-banner" style="margin-bottom: 1rem">
+            <div>
+              <strong>Static Pages demo.</strong> Everything is fake localStorage —
+              no server, no real USD, no live brokerage.
+            </div>
+          </div>
+
+          <div class="stack">
+            <button type="button" class="btn google-btn btn-block" id="btn-google">
+              <svg class="google-icon" viewBox="0 0 48 48" aria-hidden="true">
+                <path
+                  fill="#FFC107"
+                  d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3 0 5.8 1.1 7.9 3l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.5-.4-3.5z"
+                />
+                <path
+                  fill="#FF3D00"
+                  d="M6.3 14.7l6.6 4.8C14.7 16 19 12 24 12c3 0 5.8 1.1 7.9 3l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.6 8.3 6.3 14.7z"
+                />
+                <path
+                  fill="#4CAF50"
+                  d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.4 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.5 39.6 16.2 44 24 44z"
+                />
+                <path
+                  fill="#1976D2"
+                  d="M43.6 20.5H42V20H24v8h11.3c-1.1 3.1-3.5 5.5-6.5 6.6l.1.1 6.2 5.2C36.8 40.5 44 35 44 24c0-1.3-.1-2.5-.4-3.5z"
+                />
+              </svg>
+              Continue with Google
+            </button>
+
+            <div class="divider"><span>or school allowlist</span></div>
+
+            <div class="field">
+              <label for="pick-user">Continue with school email</label>
+              <select id="pick-user"></select>
+              <p class="hint">
+                Pick a seeded Alpha High account. Real Google OAuth needs a backend —
+                this Pages build uses the allowlist instead.
+              </p>
+            </div>
+
+            <button type="button" class="btn btn-primary btn-block" id="btn-continue">
+              Enter AlphaX
+            </button>
+
+            <button type="button" class="btn btn-ghost btn-block" id="btn-reset">
+              Reset demo data
+            </button>
+          </div>
+        </div>
+
+        <p class="footer-note" style="text-align: center">
+          Class Pet is required. Snack Fund · Quiet Study · Social Media · Maker Lab ·
+          AI Tools. Host from the repo <code>docs/</code> folder on GitHub Pages.
+        </p>
+      </div>
+    </div>
+
+    <div id="oauth-modal" hidden></div>
+
+    <script src="js/seed.js"></script>
+    <script src="js/market.js"></script>
+    <script src="js/store.js"></script>
+    <script src="js/chart.js"></script>
+    <script src="js/app.js"></script>
+    <script>
+      (function () {
+        var App = window.AlphaXApp;
+        var Store = window.AlphaXStore;
+
+        App.scriptsReady(function () {
+          var existing = Store.getSession();
+          if (existing) {
+            location.href = App.homeForRole(existing.role);
+            return;
+          }
+
+          var state = Store.load();
+          var select = document.getElementById("pick-user");
+          var groups = { ADMIN: [], GUIDE: [], STUDENT: [] };
+          state.users.forEach(function (u) {
+            (groups[u.role] || groups.STUDENT).push(u);
+          });
+
+          function addGroup(label, users) {
+            if (!users.length) return;
+            var og = document.createElement("optgroup");
+            og.label = label;
+            users.forEach(function (u) {
+              var opt = document.createElement("option");
+              opt.value = u.id;
+              opt.textContent =
+                u.name +
+                (u.email ? " — " + u.email : u.note ? " — " + u.note : "");
+              og.appendChild(opt);
+            });
+            select.appendChild(og);
+          }
+
+          addGroup("Admin", groups.ADMIN);
+          addGroup("Guides", groups.GUIDE);
+          addGroup("Students", groups.STUDENT);
+
+          // Default to Abi for a clear student path
+          var abi = state.users.find(function (u) {
+            return u.id === "stu-abi";
+          });
+          if (abi) select.value = abi.id;
+
+          document.getElementById("btn-continue").addEventListener("click", function () {
+            var id = select.value;
+            if (!id) return;
+            Store.setSession(id);
+            var user = Store.getSession();
+            location.href = App.homeForRole(user.role);
+          });
+
+          document.getElementById("btn-reset").addEventListener("click", function () {
+            if (
+              !confirm(
+                "Reset all demo data (requests, holdings, balances) to the seed?"
+              )
+            )
+              return;
+            Store.logout();
+            Store.reset();
+            App.toast("Demo data reset.", "ok");
+            location.reload();
+          });
+
+          document.getElementById("btn-google").addEventListener("click", function () {
+            var host = document.getElementById("oauth-modal");
+            host.hidden = false;
+            host.innerHTML =
+              '<div class="modal-backdrop" role="dialog" aria-modal="true">' +
+              '<div class="modal panel">' +
+              '<h3 class="display">Google Sign-In needs a backend</h3>' +
+              "<p>Real OAuth (Client ID/secret, redirect URI, session cookies) cannot run safely on static GitHub Pages alone. " +
+              "Use <strong>Continue with school email</strong> for this allowlist demo, or deploy the Next.js AlphaX app with Google credentials.</p>" +
+              '<div class="row-actions">' +
+              '<button type="button" class="btn btn-primary" id="oauth-ok">Got it</button>' +
+              "</div></div></div>";
+            document.getElementById("oauth-ok").addEventListener("click", function () {
+              host.hidden = true;
+              host.innerHTML = "";
+            });
+            host.querySelector(".modal-backdrop").addEventListener("click", function (e) {
+              if (e.target === this) {
+                host.hidden = true;
+                host.innerHTML = "";
+              }
+            });
+          });
+        });
+      })();
+    </script>
+  </body>
+</html>
