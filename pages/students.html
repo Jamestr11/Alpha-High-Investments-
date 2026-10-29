@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Students · AlphaX Invest</title>
+    <link rel="stylesheet" href="../css/app.css" />
+  </head>
+  <body>
+    <div id="app"></div>
+    <script src="../js/seed.js"></script>
+    <script src="../js/market.js"></script>
+    <script src="../js/store.js"></script>
+    <script src="../js/chart.js"></script>
+    <script src="../js/app.js"></script>
+    <script>
+      (function () {
+        var App = window.AlphaXApp;
+        var Store = window.AlphaXStore;
+
+        App.scriptsReady(function () {
+          var user = App.requireUser(["ADMIN"]);
+          if (!user) return;
+          var main = App.mountShell({ user: user, active: "students" });
+          var state = Store.load();
+          var students = state.users
+            .filter(function (u) {
+              return u.role === "STUDENT";
+            })
+            .slice()
+            .sort(function (a, b) {
+              return a.name.localeCompare(b.name);
+            });
+
+          main.innerHTML =
+            App.demoBanner() +
+            '<div class="section-head"><div><h2 class="display">Students</h2>' +
+            "<p>11 seeded Alpha High students. Edit AlphaX balance for the demo.</p></div></div>" +
+            '<div class="panel table-wrap"><table class="okx-table"><thead><tr>' +
+            "<th>Name</th><th>Email</th><th>Balance</th><th>Reserved</th><th>Set balance</th>" +
+            '</tr></thead><tbody id="tbody"></tbody></table></div>';
+
+          var tbody = document.getElementById("tbody");
+          students.forEach(function (s) {
+            var reserved = Store.pendingReserved(s.id);
+            var tr = document.createElement("tr");
+            tr.innerHTML =
+              "<td>" +
+              App.escapeHtml(s.name) +
+              "</td><td class=\"mono\" style=\"font-size:12px\">" +
+              App.escapeHtml(s.email || "—") +
+              '</td><td class="mono">' +
+              App.formatAlphaX(s.balance) +
+              '</td><td class="mono">' +
+              App.formatAlphaX(reserved) +
+              "</td><td>" +
+              '<form class="bal-form" data-id="' +
+              s.id +
+              '" style="display:flex;gap:0.4rem;align-items:center">' +
+              '<input type="number" name="balance" min="0" step="1" value="' +
+              s.balance +
+              '" style="width:6rem;padding:0.4rem 0.5rem;border-radius:6px;border:1px solid var(--line);background:var(--bg-deep)" />' +
+              '<button type="submit" class="btn" style="padding:0.4rem 0.65rem">Save</button>' +
+              "</form></td>";
+            tbody.appendChild(tr);
+          });
+
+          tbody.addEventListener("submit", function (e) {
+            var form = e.target.closest(".bal-form");
+            if (!form) return;
+            e.preventDefault();
+            var res = Store.setBalance(
+              user.id,
+              form.getAttribute("data-id"),
+              form.balance.value
+            );
+            if (!res.ok) {
+              App.toast(res.error, "error");
+              return;
+            }
+            App.toast("Balance updated.", "ok");
+            location.reload();
+          });
+        });
+      })();
+    </script>
+  </body>
+</html>

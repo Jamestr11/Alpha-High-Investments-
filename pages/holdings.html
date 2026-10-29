@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Holdings · AlphaX Invest</title>
+    <link rel="stylesheet" href="../css/app.css" />
+  </head>
+  <body>
+    <div id="app"></div>
+    <script src="../js/seed.js"></script>
+    <script src="../js/market.js"></script>
+    <script src="../js/store.js"></script>
+    <script src="../js/chart.js"></script>
+    <script src="../js/app.js"></script>
+    <script>
+      (function () {
+        var App = window.AlphaXApp;
+        var Store = window.AlphaXStore;
+
+        App.scriptsReady(function () {
+          var user = App.requireUser(["STUDENT"]);
+          if (!user) return;
+          var main = App.mountShell({ user: user, active: "holdings" });
+          var state = Store.load();
+          var rows = state.holdings
+            .filter(function (h) {
+              return h.studentId === user.id;
+            })
+            .map(function (h) {
+              return Store.enrichHolding(h);
+            })
+            .filter(Boolean);
+
+          var invested = rows.reduce(function (s, r) {
+            return s + r.holding.amountInvested;
+          }, 0);
+          var current = rows.reduce(function (s, r) {
+            return s + r.currentValue;
+          }, 0);
+          var pnl = Math.round((current - invested) * 100) / 100;
+
+          main.innerHTML =
+            App.demoBanner() +
+            '<div class="stats fade-up">' +
+            '<div class="stat panel"><div class="label">Positions</div><div class="value mono">' +
+            rows.length +
+            "</div></div>" +
+            '<div class="stat panel"><div class="label">Invested</div><div class="value mono">' +
+            App.formatAlphaX(invested) +
+            "</div></div>" +
+            '<div class="stat panel"><div class="label">Mark</div><div class="value mono ' +
+            (pnl >= 0 ? "up" : "down") +
+            '">' +
+            App.formatAlphaX(current) +
+            '</div><div class="hint">P&amp;L ' +
+            App.formatAlphaX(pnl) +
+            "</div></div></div>" +
+            '<div class="section-head"><div><h2 class="display">Your holdings</h2>' +
+            "<p>Mark-to-market during lock using fund β / vol / project health. No early withdrawal.</p></div></div>" +
+            '<div class="panel table-wrap" id="table"></div>';
+
+          var table = document.getElementById("table");
+          if (!rows.length) {
+            table.innerHTML =
+              '<div class="empty"><strong>No holdings yet</strong>Submit an invest request from Trade — James must approve.</div>';
+            return;
+          }
+
+          table.innerHTML =
+            '<table class="okx-table"><thead><tr>' +
+            "<th>Fund</th><th>Invested</th><th>Mark</th><th>P&amp;L</th><th>Weeks</th><th>Unlock</th>" +
+            "</tr></thead><tbody>" +
+            rows
+              .map(function (r) {
+                return (
+                  "<tr><td>" +
+                  App.escapeHtml(r.fund.symbol || r.fund.name) +
+                  (r.fund.required
+                    ? ' <span class="badge warn">Required</span>'
+                    : "") +
+                  '</td><td class="mono">' +
+                  App.formatAlphaX(r.holding.amountInvested) +
+                  '</td><td class="mono">' +
+                  App.formatAlphaX(r.currentValue) +
+                  '</td><td class="mono ' +
+                  (r.pnl >= 0 ? "up" : "down") +
+                  '">' +
+                  App.formatAlphaX(r.pnl) +
+                  '</td><td class="mono">' +
+                  r.weeksApplied +
+                  "/" +
+                  r.holding.lockWeeks +
+                  "</td><td>" +
+                  App.formatDate(r.holding.unlockDate) +
+                  "</td></tr>"
+                );
+              })
+              .join("") +
+            "</tbody></table>";
+        });
+      })();
+    </script>
+  </body>
+</html>

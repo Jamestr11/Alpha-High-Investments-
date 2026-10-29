@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AlphaX Invest · Alpha High</title>
+    <meta
+      name="description"
+      content="Artificial AlphaX investing demo for Alpha High — GitHub Pages static site. Not real money."
+    />
+    <link rel="stylesheet" href="css/app.css" />
+  </head>
+  <body>
+    <div class="login-wrap">
+      <div class="login-card fade-up">
+        <div class="login-hero">
+          <div class="brand-mark">αX</div>
+          <p class="eyebrow">Alpha High · Financial Literacy</p>
+          <h1 class="display">AlphaX Invest</h1>
+          <p>
+            Wallet-style αX investing across synthetic SPY · BTC · ETH · SOL · BNB · XRP markets.
+            James approves. Guides oversee. Not real money.
+          </p>
+        </div>
+
+        <div class="panel login-panel">
+          <div class="demo-banner">
+            <div>
+              <strong>Static Pages demo.</strong> Everything is fake localStorage —
+              no server, no real USD, no live brokerage.
+            </div>
+          </div>
+
+          <div class="stack">
+            <div id="clerk-status" class="hint" hidden></div>
+
+            <button type="button" class="btn google-btn btn-block" id="btn-google">
+              <svg class="google-icon" viewBox="0 0 48 48" aria-hidden="true">
+                <path
+                  fill="#FFC107"
+                  d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3 0 5.8 1.1 7.9 3l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.5-.4-3.5z"
+                />
+                <path
+                  fill="#FF3D00"
+                  d="M6.3 14.7l6.6 4.8C14.7 16 19 12 24 12c3 0 5.8 1.1 7.9 3l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.6 8.3 6.3 14.7z"
+                />
+                <path
+                  fill="#4CAF50"
+                  d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.4 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.5 39.6 16.2 44 24 44z"
+                />
+                <path
+                  fill="#1976D2"
+                  d="M43.6 20.5H42V20H24v8h11.3c-1.1 3.1-3.5 5.5-6.5 6.6l.1.1 6.2 5.2C36.8 40.5 44 35 44 24c0-1.3-.1-2.5-.4-3.5z"
+                />
+              </svg>
+              Continue with Google
+            </button>
+
+            <div id="clerk-sign-in" class="clerk-mount" hidden></div>
+            <p id="clerk-error" class="login-error" hidden></p>
+
+            <div id="allowlist-block">
+              <div class="divider"><span id="allowlist-divider-label">or school allowlist</span></div>
+
+              <div class="field">
+                <label for="pick-user">Continue with school email</label>
+                <select id="pick-user"></select>
+                <p class="hint" id="allowlist-hint">
+                  Pick a seeded Alpha High account. Clerk Google login activates when you paste a
+                  publishable key into <code>js/clerk-config.js</code> — see
+                  <a href="CLERK.md">CLERK.md</a>. Secret keys must never go in this static site.
+                </p>
+              </div>
+
+              <button type="button" class="btn btn-primary btn-block" id="btn-continue">
+                Enter AlphaX
+              </button>
+            </div>
+
+            <button type="button" class="btn btn-ghost btn-block" id="btn-reset">
+              Reset demo data
+            </button>
+          </div>
+        </div>
+
+        <p class="footer-note" style="text-align: center">
+          Markets: SPY (required) · BTC · ETH · SOL · BNB · XRP — artificial αX only.
+          Host from the repo <code>docs/</code> folder on GitHub Pages.
+        </p>
+      </div>
+    </div>
+
+    <div id="oauth-modal" hidden></div>
+
+    <script src="js/seed.js"></script>
+    <script src="js/market.js"></script>
+    <script src="js/store.js"></script>
+    <script src="js/chart.js"></script>
+    <script src="js/app.js"></script>
+    <script src="js/clerk-config.js"></script>
+    <script src="js/clerk-auth.js"></script>
+    <script>
+      (function () {
+        var App = window.AlphaXApp;
+        var Store = window.AlphaXStore;
+        var ClerkAuth = window.AlphaXClerkAuth;
+
+        function showClerkError(msg) {
+          var el = document.getElementById("clerk-error");
+          if (!el) return;
+          if (!msg) {
+            el.hidden = true;
+            el.textContent = "";
+            return;
+          }
+          el.hidden = false;
+          el.textContent = msg;
+        }
+
+        function applyClerkUser(clerkUser) {
+          var email = ClerkAuth.primaryEmailFromClerkUser(clerkUser);
+          var result = ClerkAuth.applySessionForEmail(email);
+          if (!result.ok) {
+            showClerkError(result.error);
+            if (window.__alphaxClerk && window.__alphaxClerk.signOut) {
+              window.__alphaxClerk.signOut().catch(function () {});
+            }
+            return false;
+          }
+          showClerkError("");
+          location.href = App.homeForRole(result.user.role);
+          return true;
+        }
+
+        function showSetupModal() {
+          var host = document.getElementById("oauth-modal");
+          host.hidden = false;
+          host.innerHTML =
+            '<div class="modal-backdrop" role="dialog" aria-modal="true">' +
+            '<div class="modal panel">' +
+            '<h3 class="display">Clerk + Google setup</h3>' +
+            "<p>Paste your Clerk <strong>publishable</strong> key (<code>pk_…</code>) into " +
+            "<code>js/clerk-config.js</code>. The <strong>secret</strong> key (<code>sk_…</code>) " +
+            "must never go in this static Pages site. Enable Google in the Clerk Dashboard and add " +
+            "Pages / localhost origins — see <a href=\"CLERK.md\">CLERK.md</a>.</p>" +
+            "<p>Until then, use <strong>Continue with school email</strong>.</p>" +
+            '<div class="row-actions">' +
+            '<button type="button" class="btn btn-primary" id="oauth-ok">Got it</button>' +
+            "</div></div></div>";
+          document.getElementById("oauth-ok").addEventListener("click", function () {
+            host.hidden = true;
+            host.innerHTML = "";
+          });
+          host.querySelector(".modal-backdrop").addEventListener("click", function (e) {
+            if (e.target === this) {
+              host.hidden = true;
+              host.innerHTML = "";
+            }
+          });
+        }
+
+        function fillAllowlist() {
+          var state = Store.load();
+          var select = document.getElementById("pick-user");
+          select.innerHTML = "";
+          var groups = { ADMIN: [], GUIDE: [], STUDENT: [] };
+          state.users.forEach(function (u) {
+            (groups[u.role] || groups.STUDENT).push(u);
+          });
+
+          function addGroup(label, users) {
+            if (!users.length) return;
+            var og = document.createElement("optgroup");
+            og.label = label;
+            users.forEach(function (u) {
+              var opt = document.createElement("option");
+              opt.value = u.id;
+              opt.textContent =
+                u.name +
+                (u.email ? " — " + u.email : u.note ? " — " + u.note : "");
+              og.appendChild(opt);
+            });
+            select.appendChild(og);
+          }
+
+          addGroup("Admin", groups.ADMIN);
+          addGroup("Guides", groups.GUIDE);
+          addGroup("Students", groups.STUDENT);
+
+          var abi = state.users.find(function (u) {
+            return u.id === "stu-abi";
+          });
+          if (abi) select.value = abi.id;
+        }
+
+        function wireAllowlist() {
+          document.getElementById("btn-continue").addEventListener("click", function () {
+            var id = document.getElementById("pick-user").value;
+            if (!id) return;
+            Store.setSession(id);
+            var user = Store.getSession();
+            location.href = App.homeForRole(user.role);
+          });
+
+          document.getElementById("btn-reset").addEventListener("click", function () {
+            if (
+              !confirm(
+                "Reset all demo data (requests, holdings, balances) to the seed?"
+              )
+            )
+              return;
+            var done = function () {
+              Store.logout();
+              Store.reset();
+              App.toast("Demo data reset.", "ok");
+              location.reload();
+            };
+            if (ClerkAuth.isConfigured()) {
+              ClerkAuth.getClerk()
+                .then(function (clerk) {
+                  if (clerk && clerk.signOut) return clerk.signOut();
+                })
+                .catch(function () {})
+                .then(done);
+            } else {
+              done();
+            }
+          });
+        }
+
+        function startClerkGoogle(clerk) {
+          showClerkError("");
+          var redirect = location.href.split("#")[0];
+          if (typeof clerk.authenticateWithRedirect === "function") {
+            return clerk.authenticateWithRedirect({
+              strategy: "oauth_google",
+              redirectUrl: redirect,
+              redirectUrlComplete: redirect,
+            });
+          }
+          if (typeof clerk.openSignIn === "function") {
+            clerk.openSignIn({
+              forceRedirectUrl: redirect,
+              signInForceRedirectUrl: redirect,
+            });
+            return Promise.resolve();
+          }
+          return Promise.reject(new Error("Clerk sign-in API unavailable."));
+        }
+
+        function mountClerkUi(clerk) {
+          var mount = document.getElementById("clerk-sign-in");
+          var status = document.getElementById("clerk-status");
+          var hint = document.getElementById("allowlist-hint");
+          var divider = document.getElementById("allowlist-divider-label");
+
+          status.hidden = false;
+          status.textContent =
+            "Clerk publishable key detected — Google sign-in uses Clerk. Secret key is not used on Pages.";
+          if (divider) divider.textContent = "or demo allowlist";
+          if (hint) {
+            hint.innerHTML =
+              "Demo picker still works without Google. Production path: school Google via Clerk → seeded @alpha.school row. Setup: <a href=\"CLERK.md\">CLERK.md</a>.";
+          }
+
+          if (clerk.user) {
+            applyClerkUser(clerk.user);
+            return;
+          }
+
+          if (mount && typeof clerk.mountSignIn === "function") {
+            mount.hidden = false;
+            try {
+              clerk.mountSignIn(mount, {
+                routing: "hash",
+                forceRedirectUrl: location.href.split("#")[0],
+                signInForceRedirectUrl: location.href.split("#")[0],
+              });
+            } catch (e) {
+              mount.hidden = true;
+            }
+          }
+
+          if (typeof clerk.addListener === "function") {
+            clerk.addListener(function (res) {
+              var user = (res && res.user) || clerk.user;
+              if (user) applyClerkUser(user);
+            });
+          }
+        }
+
+        App.scriptsReady(function () {
+          var existing = Store.getSession();
+          if (existing) {
+            location.href = App.homeForRole(existing.role);
+            return;
+          }
+
+          fillAllowlist();
+          wireAllowlist();
+
+          var googleBtn = document.getElementById("btn-google");
+
+          if (!ClerkAuth.isConfigured()) {
+            googleBtn.addEventListener("click", function () {
+              showSetupModal();
+            });
+            return;
+          }
+
+          googleBtn.disabled = true;
+          googleBtn.setAttribute("aria-busy", "true");
+
+          ClerkAuth.getClerk()
+            .then(function (clerk) {
+              googleBtn.disabled = false;
+              googleBtn.removeAttribute("aria-busy");
+              if (!clerk) {
+                googleBtn.addEventListener("click", showSetupModal);
+                return;
+              }
+              mountClerkUi(clerk);
+              googleBtn.addEventListener("click", function () {
+                startClerkGoogle(clerk).catch(function (err) {
+                  showClerkError(
+                    (err && err.message) ||
+                      "Could not start Google sign-in. Check Clerk Dashboard origins and Google connection."
+                  );
+                });
+              });
+            })
+            .catch(function (err) {
+              googleBtn.disabled = false;
+              googleBtn.removeAttribute("aria-busy");
+              showClerkError(
+                (err && err.message) ||
+                  "Clerk failed to load. Using school allowlist — check the publishable key and network."
+              );
+              googleBtn.addEventListener("click", showSetupModal);
+            });
+        });
+      })();
+    </script>
+  </body>
+</html>
